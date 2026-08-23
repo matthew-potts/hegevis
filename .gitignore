@@ -5,3 +5,10 @@
 *.png
 *.txt
 README.md
+
+# Shipped resources, not build output. The rules above are aimed at the example
+# proofs and prepress sidecars in examples/out/; the masthead artwork is part of
+# the package and has to reach both git and the wheel, which hatchling builds
+# from these same rules.
+!src/hegevis/assets/*.png
+!src/hegevis/assets/*.jpeg

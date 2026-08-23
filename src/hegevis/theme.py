@@ -71,6 +71,20 @@ class Layout:
 
 
 @dataclass(frozen=True)
+class Logo:
+    """Where the masthead mark sits and how big it is, in millimetres.
+
+    There is no on/off switch here on purpose: the mark is house furniture, the
+    same as the source line. See :mod:`hegevis.logo`.
+    """
+
+    height_mm: float = 7.0
+    inset_mm: float = 2.5   # from the trim, matching the source line's inset
+    gap_mm: float = 4.0     # clear space between the footer text and the mark
+    path: str = ""          # override the packaged asset; "" uses it
+
+
+@dataclass(frozen=True)
 class Theme:
     name: str = "unnamed"
     family: tuple[str, ...] = ("DejaVu Sans",)
@@ -95,6 +109,7 @@ class Theme:
     status: dict = field(default_factory=dict)
     entities: dict = field(default_factory=dict)
     layout: Layout = field(default_factory=Layout)
+    logo: Logo = field(default_factory=Logo)
     cmyk: dict = field(default_factory=dict)
     source_path: Path | None = None
 
@@ -128,6 +143,7 @@ def read_theme(path: str | Path) -> Theme:
     c = raw.get("color", {})
     lay = raw.get("layout", {})
     marg = lay.get("margin", {})
+    lg = raw.get("logo", {})
 
     known = {f.name for f in (TypeScale.__dataclass_fields__.values())}
     unknown = set(sizes) - known
@@ -172,6 +188,12 @@ def read_theme(path: str | Path) -> Theme:
                 top=float(marg.get("top", 12.0)),
                 bottom=float(marg.get("bottom", 11.0)),
             ),
+        ),
+        logo=Logo(
+            height_mm=float(lg.get("height_mm", 7.0)),
+            inset_mm=float(lg.get("inset_mm", 2.5)),
+            gap_mm=float(lg.get("gap_mm", 4.0)),
+            path=str(lg.get("path", "")),
         ),
         cmyk={strip_ws(k).lower(): tuple(v) for k, v in raw.get("cmyk", {}).items()},
         source_path=path,

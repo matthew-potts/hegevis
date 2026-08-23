@@ -7,8 +7,8 @@ Two things this module exists to guarantee:
    paper. Nothing is scaled on the way to the page -- which is also why the
    house style never saves with ``bbox_inches="tight"``.
 2. **Every chart carries the same furniture, in the same place.** Title,
-   subtitle, source and note are placed by the package, not by each analyst,
-   so they line up across articles.
+   subtitle, source, note and the masthead mark are placed by the package, not
+   by each analyst, so they line up across articles.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 
+from . import logo as _logo
 from .rc import is_active, use
 from .theme import MM, Theme, get_theme
 
@@ -84,6 +85,9 @@ def figure(size="col1", *, height=None, ratio=None, theme: Theme | None = None,
         sharex=sharex, sharey=sharey, **kwargs,
     )
     fig.set_facecolor(t.surface)
+    # Before the margins, so the plot area is laid out around the mark rather
+    # than having it dropped on top afterwards.
+    _logo.stamp(fig, t)
     _apply_margins(fig, t)
     return fig, axes
 
@@ -99,6 +103,12 @@ def _apply_margins(fig, t: Theme, extra_top_in=0.0, extra_bottom_in=0.0):
     extra_left_in = getattr(fig, "_hegevis_label_left_in", 0.0)
     # A legend above the plot needs its own band, or the title lands on it.
     extra_top_in = extra_top_in + getattr(fig, "_hegevis_legend_top_in", 0.0)
+    # The masthead mark sits in the bottom-right corner. This is a floor, not
+    # an addition: the default bottom margin usually already clears it, and a
+    # source line pushes the plot further up than the mark ever does.
+    if _logo.has_logo(fig):
+        extra_bottom_in = max(extra_bottom_in,
+                              _logo.reserved_bottom_in(t) - m.bottom * MM)
     fig.subplots_adjust(
         left=(m.left * MM + extra_left_in) / w_in,
         right=1 - (m.right * MM + extra_right_in) / w_in,
@@ -117,11 +127,20 @@ def finish(fig, *, title=None, subtitle=None, source=None, note=None,
     a gap.
 
     ``source`` is prefixed "Source: " automatically; pass the bare citation.
+
+    The masthead mark is added here if the figure does not already carry it --
+    it is furniture like the source line, not something to opt into.
     """
     t = theme or get_theme()
+    _logo.stamp(fig, t)
     w_in, h_in = fig.get_size_inches()
     m = t.layout.margin
     text_w_in = w_in - (m.left + m.right) * MM
+    # The footer shares its band with the mark, so it wraps to a shorter
+    # measure than the title does. Floored, so an outsized logo in a hand-
+    # edited theme cannot squeeze the source line down to one word a line.
+    foot_w_in = max(text_w_in - _logo.size_in(t)[0] - t.logo.gap_mm * MM,
+                    text_w_in * 0.4)
 
     # -- top block: title then subtitle -------------------------------------
     title_lines = wrap(fig, title, text_w_in, t.size.title, t.weight_bold) if title else []
@@ -138,9 +157,9 @@ def finish(fig, *, title=None, subtitle=None, source=None, note=None,
     # -- bottom block: source, then note ------------------------------------
     foot = []
     if source:
-        foot.extend(wrap(fig, f"Source: {source}", text_w_in, t.size.source))
+        foot.extend(wrap(fig, f"Source: {source}", foot_w_in, t.size.source))
     if note:
-        foot.extend(wrap(fig, note, text_w_in, t.size.source))
+        foot.extend(wrap(fig, note, foot_w_in, t.size.source))
     bottom_in = (len(foot) * t.size.source * LINE_SPACING * PT
                  + (BLOCK_GAP_PT * PT if foot else 0.0))
 

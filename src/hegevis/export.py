@@ -19,6 +19,7 @@ from pathlib import Path
 import matplotlib as mpl
 from matplotlib.colors import to_hex
 
+from . import logo as _logo
 from .color import simulate_hex
 from .rc import output_params
 from .theme import Theme, get_theme
@@ -30,7 +31,9 @@ def colors_used(fig) -> set[str]:
     """Every colour actually drawn in the figure, as hex.
 
     Walks the artists rather than the theme, so it catches a stray colour an
-    analyst hard-coded past the palette.
+    analyst hard-coded past the palette. The masthead mark is skipped: it is a
+    placed raster, and prepress handles its inks from the brand artwork rather
+    than from a chart's colour manifest.
     """
     found: set[str] = set()
 
@@ -44,6 +47,8 @@ def colors_used(fig) -> set[str]:
         found.add(h.lower())
 
     for ax in fig.get_axes():
+        if _logo.is_logo_axes(ax):
+            continue
         for ln in ax.get_lines():
             add(ln.get_color())
         for p in ax.patches:
@@ -113,8 +118,13 @@ def save(fig, path, *, manifest=False, outline_text=False, theme=None,
 
     Never passes ``bbox_inches="tight"``: the figure was built at true column
     width, and a tight box would silently change it.
+
+    The masthead mark is asserted here as well as in ``finish()``, so a figure
+    that skipped the house furniture -- a bare ``plt.subplots()`` an analyst
+    saved through this function -- still leaves with the mark on it.
     """
     t = theme or get_theme()
+    _logo.stamp(fig, t)
     path = Path(path)
     suffix = path.suffix.lower()
     if not suffix:
@@ -159,6 +169,9 @@ def simulate_figure(fig, kind: str = "deutan"):
 
     Destructive -- save the real figure first, then simulate, then save the
     proof. ``kind`` is "protan", "deutan" or "tritan".
+
+    The masthead mark is left alone: the proof asks whether the *data* can be
+    told apart, and a brand mark that reads differently is not a chart fault.
     """
     def conv(c):
         try:
@@ -167,6 +180,8 @@ def simulate_figure(fig, kind: str = "deutan"):
             return None
 
     for ax in fig.get_axes():
+        if _logo.is_logo_axes(ax):
+            continue
         for ln in ax.get_lines():
             new = conv(ln.get_color())
             if new:

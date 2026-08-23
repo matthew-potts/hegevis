@@ -146,6 +146,25 @@ right  = 6.0
 top    = 12.0
 bottom = 11.0
 
+# -- Masthead mark ------------------------------------------------------------
+# Every chart carries the logo, bottom-right, hanging off the right margin the
+# way the title hangs off the left. There is no switch to turn it off: charts
+# get republished and pasted into decks a long way from the article they were
+# drawn for, and the mark is what still says where the number came from.
+#
+# Sized in MILLIMETRES, so it is the same physical mark on a single-column
+# chart as on a full-page one, rather than growing with the figure.
+#
+# `path` overrides the packaged artwork (a relative path is read against this
+# file's directory). Supply artwork with a transparent field -- the mark sits
+# directly on the surface cream above, so a white background would show as a
+# pale square. `tools/make_logo_asset.py` does that conversion for a JPEG.
+[logo]
+height_mm = 7.0
+inset_mm  = 2.5   # from the trim; matches the source line's optical inset
+gap_mm    = 4.0   # clear space between the source line and the mark
+# path    = "hegemon_logo.png"
+
 # -- CMYK declarations --------------------------------------------------------
 # matplotlib emits RGB; the conversion belongs in prepress with the press
 # profile. Record the agreed CMYK build per colour here and
