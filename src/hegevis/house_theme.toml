@@ -1,0 +1,155 @@
+# =============================================================================
+#  HOUSE THEME  --  Helsinki Geoeconomics Society
+#
+#  The one file you edit to change how every chart looks. Change a value here
+#  and every chart in every article follows, with no analyst touching anything.
+#
+#  After editing colours, ALWAYS re-run:
+#      hegevis-validate                 # categorical slots, adjacent pairs
+#      hegevis-validate --pairs all     # stricter, for scatter/map forms
+#      hegevis-validate --ordinal       # the magnitude ramp
+#
+#  Colours were derived from the Communiqué cover with `python -m hegevis.brand`
+#  and every one of them passes the checks. See the notes on each block before
+#  changing anything by hand.
+# =============================================================================
+
+name = "Helsinki Geoeconomics Society"
+
+# -- Typography ---------------------------------------------------------------
+# The cover pairs a bold grotesque (wordmark, standfirst) with a high-contrast
+# display serif (the "Communiqué" title).
+#
+#   >>> TODO: put the LICENSED brand face first in each list below. <<<
+#
+# Until then hegevis warns at import that charts are not in the house face --
+# that warning is the reminder, and it stops once the real font is named and
+# installed. First installed family wins, so the fallbacks keep work moving.
+[type]
+family       = ["Inter", "Helvetica Neue", "Arial", "DejaVu Sans"]
+
+# Chart titles stay in the SANS, not the cover serif. The serif is a display
+# face: it is drawn for 60pt headlines, and at a 10.5pt chart title its thin
+# strokes break up in print. The cover's own standfirst is set in the sans for
+# the same reason. To use the serif anyway, put it here:
+#   title_family = ["<Brand Serif>", "Charter", "Georgia"]
+title_family  = []
+
+weight_normal = 400
+weight_medium = 500
+weight_bold   = 600
+
+# Point sizes as they appear at final print size. The figure is built at its
+# true printed width, so 8pt here is 8pt on paper.
+[type.size]
+title    = 10.5
+subtitle = 9.0
+axis     = 7.5
+tick     = 7.5
+label    = 7.5
+legend   = 7.5
+source   = 6.5
+
+# -- Colour -------------------------------------------------------------------
+# The cover's aubergine is a GROUND colour, not a data colour: at OKLCH L 0.29
+# it is far too dark to be a series hue, and lifting it into the legal band
+# turns it into a mid-purple that collides with the burgundy. So it does on the
+# page what it does on the cover -- it is the ink. Every neutral below is that
+# same aubergine hue (342 deg) desaturated, so the greys belong to the brand
+# rather than being generic.
+[color]
+surface   = "#f5f1e7"   # the cover cream: the chart's own ground
+page      = "#ede9e1"   # a touch deeper, for the page behind the chart
+
+ink       = "#3a2231"   # the cover aubergine: titles, primary text  (12.8:1)
+ink_soft  = "#5e4855"   # subtitles                                   (7.4:1)
+ink_muted = "#7a6772"   # axis labels, ticks, source line             (4.6:1)
+neutral   = "#93808b"   # de-emphasis grey for context series         (3.3:1)
+axis      = "#c7b9c1"   # baseline / spine
+grid      = "#e2d7dd"   # hairline gridlines
+
+# Categorical slots, IN FIXED ORDER. Slots 1-2 are the brand's own colours and
+# carry most charts, since most charts have two or three series.
+#
+# Slots 3-8 are NOT in the brand palette, and cannot be. The brand's three
+# colours sit within a 66-degree arc of hue (342, 11, 48) -- which is precisely
+# what makes them harmonious, and precisely why they cannot carry eight
+# separate identities. Slots 3-8 are spaced away in hue and matched to the
+# brand's lightness and chroma, so they read as relatives rather than
+# strangers. Every adjacent pair clears the colour-vision gates and every slot
+# clears 3:1 against the cream.
+#
+# Slot 1 is the cover orange darkened from #e98650 to #d1703a: the logo colour
+# is 2.33:1 on cream, too pale to carry a 1pt line in print. The hue is
+# unchanged, and it is the same colour family a reader sees on the cover.
+series = [
+  "#d1703a",  # 1 brand orange, darkened for print   (3.0:1)
+  "#962241",  # 2 brand burgundy, lifted into band   (6.8:1)
+  "#0097aa",  # 3 teal
+  "#aa8400",  # 4 ochre
+  "#277fce",  # 5 blue
+  "#628b14",  # 6 olive
+  "#7c69cb",  # 7 violet
+  "#009e78",  # 8 green
+]
+
+# Magnitude ramp: the brand orange, light -> dark. The palest step is lighter
+# than a discrete mark should be -- that is deliberate for heatmaps, where
+# "near zero" should recede toward the paper. Palette.ordinal() drops those
+# steps automatically when you need discrete bands.
+sequential = [
+  "#ffe1d2", "#ebbba3", "#d0987b", "#b67654", "#9c542c", "#7d3500", "#552100",
+]
+
+# Polarity: warm/cool poles around a neutral midpoint. Deficit reads cool,
+# surplus reads warm. The midpoint is a desaturated aubergine, so "no change"
+# reads as nothing rather than as a third category.
+[color.diverging]
+low  = "#277fce"
+mid  = "#e2dcdf"
+high = "#d1703a"
+
+# Reserved meanings -- never reused as "series 9", always shipped with a label.
+# These deliberately do NOT follow the brand: a status colour that looked like
+# a series colour would be worse than one that clashes slightly.
+# NOTE: `serious` (#ec835a) is close in hue to the brand orange in slot 1. If a
+# chart ever carries both, the label is what separates them -- never the hue
+# alone.
+[color.status]
+good     = "#0ca30c"
+warning  = "#fab219"
+serious  = "#ec835a"
+critical = "#d03b3b"
+
+# -- Persistent entity colours ------------------------------------------------
+# "Colour follows the entity, never its rank": if China is slot 2 in one
+# article it is slot 2 in every article, and filtering a series never repaints
+# the survivors. Add the recurring actors here (0-indexed into `series`).
+[entities]
+# "United States"  = 0
+# "China"          = 1
+# "European Union" = 2
+
+# -- Print geometry -----------------------------------------------------------
+# Widths in MILLIMETRES. >>> TODO: confirm against the Communiqué grid. <<<
+[layout]
+col1  = 88.0
+col15 = 120.0
+col2  = 180.0
+page  = 180.0
+
+default_ratio = 0.618
+
+[layout.margin]
+left   = 14.0
+right  = 6.0
+top    = 12.0
+bottom = 11.0
+
+# -- CMYK declarations --------------------------------------------------------
+# matplotlib emits RGB; the conversion belongs in prepress with the press
+# profile. Record the agreed CMYK build per colour here and
+# `hegevis.save(..., manifest=True)` writes a sidecar listing every colour a
+# figure used with its declared build. >>> TODO: ask the art desk. <<<
+[cmyk]
+# "#d1703a" = [0, 60, 78, 6]
