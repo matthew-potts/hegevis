@@ -102,11 +102,26 @@ def test_style_context_restores_previous_rcparams():
 
 
 def test_missing_brand_font_warns_loudly():
+    """A chart in the wrong face must never ship silently."""
     from hegevis import rc
+    t = hv.get_theme()
+    absent = hv.Theme(**{**t.__dict__, "family": ("No Such Face Anywhere",)})
     rc._font_warned = False
     with pytest.warns(UserWarning, match="not installed"):
-        rc.rc_params()
+        rc.rc_params(absent)
     rc._font_warned = False
+
+
+def test_the_licensed_house_face_is_found_when_it_is_present():
+    """Gill Sans is registered from assets/fonts/ or the system; when it is
+    there, the house style must resolve to it rather than a fallback."""
+    from hegevis import fonts, rc
+    fonts.register()
+    if "Gill Sans" not in fonts.installed():
+        pytest.skip("licensed faces are not installed on this machine")
+    body, missing = rc.resolve_font(hv.get_theme().family)
+    assert body == "Gill Sans"
+    assert missing == []
 
 
 def test_public_style_name_is_the_context_manager_not_a_module():

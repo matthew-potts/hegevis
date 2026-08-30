@@ -8,83 +8,69 @@
 #      hegevis-validate                 # categorical slots, adjacent pairs
 #      hegevis-validate --pairs all     # stricter, for scatter/map forms
 #      hegevis-validate --ordinal       # the magnitude ramp
-#
-#  Colours were derived from the Communiqué cover with `python -m hegevis.brand`
-#  and every one of them passes the checks. See the notes on each block before
-#  changing anything by hand.
 # =============================================================================
 
 name = "Helsinki Geoeconomics Society"
 
 # -- Typography ---------------------------------------------------------------
-# The cover pairs a bold grotesque (wordmark, standfirst) with a high-contrast
-# display serif (the "Communiqué" title).
+# The publication is set in Tiempos Headline (display serif) and Gill Sans
+# (humanist sans). Both are LICENSED faces and are deliberately not shipped in
+# the package -- drop your licensed copies into src/hegevis/assets/fonts/ and
+# hegevis registers them with matplotlib at import.
 #
-#   >>> TODO: put the LICENSED brand face first in each list below. <<<
+# Both faces are used, in the roles the sample spread uses them for: Tiempos
+# Headline sets the headline, Gill Sans sets everything else.
 #
-# Until then hegevis warns at import that charts are not in the house face --
-# that warning is the reminder, and it stops once the real font is named and
-# installed. First installed family wins, so the fallbacks keep work moving.
+# The chart title is a headline, so it takes the serif. The SUBTITLE does not:
+# it is a running gloss, it wraps to two and three lines, and Tiempos Headline
+# is a display face drawn for 60pt -- at 8.5pt over three lines its thin
+# strokes break up in print. Everything from the subtitle down is the sans.
+#
+# Set title_family = [] to put chart titles back in the sans.
 [type]
-family       = ["Inter", "Helvetica Neue", "Arial", "DejaVu Sans"]
-
-# Chart titles stay in the SANS, not the cover serif. The serif is a display
-# face: it is drawn for 60pt headlines, and at a 10.5pt chart title its thin
-# strokes break up in print. The cover's own standfirst is set in the sans for
-# the same reason. To use the serif anyway, put it here:
-#   title_family = ["<Brand Serif>", "Charter", "Georgia"]
-title_family  = []
+family       = ["Gill Sans", "Gill Sans MT", "Helvetica Neue", "DejaVu Sans"]
+title_family = ["Tiempos Headline", "Tiempos Text", "Charter", "Georgia"]
 
 weight_normal = 400
 weight_medium = 500
 weight_bold   = 600
 
-# Point sizes as they appear at final print size. The figure is built at its
-# true printed width, so 8pt here is 8pt on paper.
+# ONE text size for everything inside the chart. The old scale had five sizes
+# doing five slightly different jobs; a reader cannot decode a hierarchy that
+# fine at 88mm, and the variation just made charts look busy. Title and
+# subtitle step up; the footnote steps well down and is the only thing smaller.
 [type.size]
-title    = 10.5
-subtitle = 9.0
-axis     = 7.5
-tick     = 7.5
-label    = 7.5
-legend   = 7.5
-source   = 6.5
+title    = 10.0
+subtitle = 8.5
+body     = 7.0   # ticks, axis titles, series labels, value labels -- all of it
+footnote = 5.5   # source and note: deliberately small, it is not the story
 
 # -- Colour -------------------------------------------------------------------
-# The cover's aubergine is a GROUND colour, not a data colour: at OKLCH L 0.29
-# it is far too dark to be a series hue, and lifting it into the legal band
-# turns it into a mid-purple that collides with the burgundy. So it does on the
-# page what it does on the cover -- it is the ink. Every neutral below is that
-# same aubergine hue (342 deg) desaturated, so the greys belong to the brand
-# rather than being generic.
+# The off-white ground is the chart's most recognisable feature: it fills the
+# whole box, edge to edge, and every chart has it. Nothing is drawn on white.
 [color]
-surface   = "#f5f1e7"   # the cover cream: the chart's own ground
-page      = "#ede9e1"   # a touch deeper, for the page behind the chart
+surface   = "#e9e6de"   # the off-white box: the chart's own ground
+page      = "#f5f1e7"   # the cream of the page behind the box
 
-ink       = "#3a2231"   # the cover aubergine: titles, primary text  (12.8:1)
-ink_soft  = "#5e4855"   # subtitles                                   (7.4:1)
-ink_muted = "#7a6772"   # axis labels, ticks, source line             (4.6:1)
-neutral   = "#93808b"   # de-emphasis grey for context series         (3.3:1)
-axis      = "#c7b9c1"   # baseline / spine
-grid      = "#e2d7dd"   # hairline gridlines
+ink       = "#2a1a24"   # titles, primary text
+ink_soft  = "#5e4855"   # subtitles, series labels
+ink_muted = "#7a6772"   # ticks, axis titles, footnote
+neutral   = "#a89aa1"   # de-emphasis grey for context series
+axis      = "#2a1a24"   # the baseline is real ink, not a hairline
+grid      = "#d6cfd2"   # hairline gridlines
+
+# The masthead tab: the solid rectangle top-left that opens every chart. It is
+# the brand orange rather than a borrowed red -- the layout is the convention,
+# the colour is ours.
+tab       = "#d1703a"
 
 # Categorical slots, IN FIXED ORDER. Slots 1-2 are the brand's own colours and
-# carry most charts, since most charts have two or three series.
-#
-# Slots 3-8 are NOT in the brand palette, and cannot be. The brand's three
-# colours sit within a 66-degree arc of hue (342, 11, 48) -- which is precisely
-# what makes them harmonious, and precisely why they cannot carry eight
-# separate identities. Slots 3-8 are spaced away in hue and matched to the
-# brand's lightness and chroma, so they read as relatives rather than
-# strangers. Every adjacent pair clears the colour-vision gates and every slot
-# clears 3:1 against the cream.
-#
-# Slot 1 is the cover orange darkened from #e98650 to #d1703a: the logo colour
-# is 2.33:1 on cream, too pale to carry a 1pt line in print. The hue is
-# unchanged, and it is the same colour family a reader sees on the cover.
+# carry most charts, since most charts have two or three series. Slots 3-8 are
+# spaced away in hue and matched to the brand's lightness and chroma. Every
+# adjacent pair clears the colour-vision gates.
 series = [
-  "#d1703a",  # 1 brand orange, darkened for print   (3.0:1)
-  "#962241",  # 2 brand burgundy, lifted into band   (6.8:1)
+  "#d1703a",  # 1 brand orange, darkened for print
+  "#962241",  # 2 brand burgundy, lifted into band
   "#0097aa",  # 3 teal
   "#aa8400",  # 4 ochre
   "#277fce",  # 5 blue
@@ -93,28 +79,30 @@ series = [
   "#009e78",  # 8 green
 ]
 
-# Magnitude ramp: the brand orange, light -> dark. The palest step is lighter
-# than a discrete mark should be -- that is deliberate for heatmaps, where
-# "near zero" should recede toward the paper. Palette.ordinal() drops those
-# steps automatically when you need discrete bands.
+# Magnitude ramp: the brand orange, light -> dark.
+#
+# Rebuilt when the ground moved from the old cream (#f5f1e7) to the darker
+# off-white above. The old ramp opened at #ffe1d2, which was 1.01:1 against
+# this surface -- a step the reader simply cannot see, and only four of its
+# seven steps still cleared the floor, so Palette.ordinal() started repeating.
+#
+# Nine steps now, and the split is deliberate. The first two sit BELOW the
+# ordinal floor on purpose: that is what makes "near zero" recede toward the
+# paper on a heatmap. The remaining seven all clear it, which is what
+# Palette.ordinal() draws on for discrete bands -- so both jobs are covered
+# without one compromising the other.
+#     hegevis-validate --ordinal
 sequential = [
-  "#ffe1d2", "#ebbba3", "#d0987b", "#b67654", "#9c542c", "#7d3500", "#552100",
+  "#f1c7b2", "#ddad95",                                        # heatmap-only
+  "#ca9378", "#b67a5c", "#a3613f", "#8f4921", "#793200",       # discrete steps
+  "#5b2400", "#3f1600",
 ]
 
-# Polarity: warm/cool poles around a neutral midpoint. Deficit reads cool,
-# surplus reads warm. The midpoint is a desaturated aubergine, so "no change"
-# reads as nothing rather than as a third category.
 [color.diverging]
 low  = "#277fce"
 mid  = "#e2dcdf"
 high = "#d1703a"
 
-# Reserved meanings -- never reused as "series 9", always shipped with a label.
-# These deliberately do NOT follow the brand: a status colour that looked like
-# a series colour would be worse than one that clashes slightly.
-# NOTE: `serious` (#ec835a) is close in hue to the brand orange in slot 1. If a
-# chart ever carries both, the label is what separates them -- never the hue
-# alone.
 [color.status]
 good     = "#0ca30c"
 warning  = "#fab219"
@@ -123,52 +111,50 @@ critical = "#d03b3b"
 
 # -- Persistent entity colours ------------------------------------------------
 # "Colour follows the entity, never its rank": if China is slot 2 in one
-# article it is slot 2 in every article, and filtering a series never repaints
-# the survivors. Add the recurring actors here (0-indexed into `series`).
+# article it is slot 2 in every article.
 [entities]
 # "United States"  = 0
 # "China"          = 1
-# "European Union" = 2
 
 # -- Print geometry -----------------------------------------------------------
-# Widths in MILLIMETRES. >>> TODO: confirm against the Communiqué grid. <<<
+# Widths in MILLIMETRES. Charts are BOXES, slightly taller than wide -- the
+# proportion the sample charts use, and the one that fits a column well.
 [layout]
 col1  = 88.0
 col15 = 120.0
 col2  = 180.0
 page  = 180.0
 
-default_ratio = 0.618
+default_ratio = 1.15   # height / width: portrait, slightly taller than wide
 
+# Margins are measured from the edge of the OFF-WHITE BOX, not the trim: the
+# box is the chart, so its own padding is what the reader sees.
+#
+# The foot is 9mm: enough for the x labels and a 5.5pt source line, and no
+# more. It used to reserve room for a logo in the bottom-right corner; the tab
+# carries the branding now, so that space went back to the plot.
 [layout.margin]
-left   = 14.0
-right  = 6.0
-top    = 12.0
-bottom = 11.0
+left   = 13.0
+right  = 9.0
+top    = 22.0   # room for the tab, title and subtitle
+bottom = 9.0
 
-# -- Masthead mark ------------------------------------------------------------
-# Every chart carries the logo, bottom-right, hanging off the right margin the
-# way the title hangs off the left. There is no switch to turn it off: charts
-# get republished and pasted into decks a long way from the article they were
-# drawn for, and the mark is what still says where the number came from.
-#
-# Sized in MILLIMETRES, so it is the same physical mark on a single-column
-# chart as on a full-page one, rather than growing with the figure.
-#
-# `path` overrides the packaged artwork (a relative path is read against this
-# file's directory). Supply artwork with a transparent field -- the mark sits
-# directly on the surface cream above, so a white background would show as a
-# pale square. `tools/make_logo_asset.py` does that conversion for a JPEG.
-[logo]
-height_mm = 7.0
-inset_mm  = 2.5   # from the trim; matches the source line's optical inset
-gap_mm    = 4.0   # clear space between the source line and the mark
-# path    = "hegemon_logo.png"
+# -- The masthead tab ---------------------------------------------------------
+# The solid rectangle at the top-left of every chart, above the title.
+[tab]
+width_mm  = 14.0
+height_mm = 2.2
+top_mm    = 4.5   # from the top edge of the box
+
+# -- Text limits --------------------------------------------------------------
+# Word counts, enforced not suggested. A chart title that needs 18 words is an
+# article paragraph wearing a chart's clothes; hegevis warns so it gets cut
+# before it reaches the page rather than after.
+[text]
+title_words    = 8
+subtitle_words = 14
+footnote_words = 20
 
 # -- CMYK declarations --------------------------------------------------------
-# matplotlib emits RGB; the conversion belongs in prepress with the press
-# profile. Record the agreed CMYK build per colour here and
-# `hegevis.save(..., manifest=True)` writes a sidecar listing every colour a
-# figure used with its declared build. >>> TODO: ask the art desk. <<<
 [cmyk]
 # "#d1703a" = [0, 60, 78, 6]

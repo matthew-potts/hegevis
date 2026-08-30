@@ -13,16 +13,19 @@ Two things this module exists to guarantee:
 
 from __future__ import annotations
 
+import warnings
+
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg
+from matplotlib.patches import Rectangle
 
-from . import logo as _logo
 from .rc import is_active, use
 from .theme import MM, Theme, get_theme
 
 PT = 1 / 72  # points -> inches
 LINE_SPACING = 1.25
 BLOCK_GAP_PT = 3.0  # between title and subtitle, and above the source line
+TAB_GAP_MM = 3.0    # between the masthead tab and the first line of the title
 
 
 def _renderer(fig):
@@ -33,21 +36,28 @@ def _renderer(fig):
         return FigureCanvasAgg(fig).get_renderer()
 
 
-def _text_width_in(fig, s: str, size: float, weight) -> float:
-    t = fig.text(0, 0, s, fontsize=size, fontweight=weight)
+def _text_width_in(fig, s: str, size: float, weight, family=None) -> float:
+    kw = {"fontfamily": list(family)} if family else {}
+    t = fig.text(0, 0, s, fontsize=size, fontweight=weight, **kw)
     w = t.get_window_extent(renderer=_renderer(fig)).width / fig.dpi
     t.remove()
     return w
 
 
-def wrap(fig, s: str, width_in: float, size: float, weight=400) -> list[str]:
-    """Word-wrap by measuring the actual face, not by counting characters."""
+def wrap(fig, s: str, width_in: float, size: float, weight=400,
+         family=None) -> list[str]:
+    """Word-wrap by measuring the actual face, not by counting characters.
+
+    ``family`` matters: the title is set in the serif and the rest in the sans,
+    and the two measure differently at the same point size. Wrapping the title
+    against the sans would put the break in the wrong place.
+    """
     if not s:
         return []
     words, lines, cur = s.split(), [], ""
     for word in words:
         trial = f"{cur} {word}".strip()
-        if cur and _text_width_in(fig, trial, size, weight) > width_in:
+        if cur and _text_width_in(fig, trial, size, weight, family) > width_in:
             lines.append(cur)
             cur = word
         else:
@@ -85,11 +95,52 @@ def figure(size="col1", *, height=None, ratio=None, theme: Theme | None = None,
         sharex=sharex, sharey=sharey, **kwargs,
     )
     fig.set_facecolor(t.surface)
-    # Before the margins, so the plot area is laid out around the mark rather
-    # than having it dropped on top afterwards.
-    _logo.stamp(fig, t)
+    for ax in (axes.flat if hasattr(axes, "flat") else [axes]):
+        ax.set_facecolor(t.surface)
+    # Before the margins, so the plot area is laid out around it rather than
+    # having it dropped on top afterwards.
+    _tab(fig, t)
     _apply_margins(fig, t)
     return fig, axes
+
+
+def _tab(fig, t: Theme):
+    """The solid rectangle top-left that opens every chart.
+
+    It is the one mark on the page that is the same on every chart in every
+    article, which is what makes a reader recognise the chart as ours before
+    reading a word of it. Placed in figure coordinates so it never moves with
+    the plot area, and drawn in brand orange rather than a borrowed red.
+    """
+    if getattr(fig, "_hegevis_tab", None) is not None:
+        return fig._hegevis_tab
+    w_in, h_in = fig.get_size_inches()
+    m = t.layout.margin
+    rect = Rectangle(
+        ((m.left * MM) / w_in, 1 - (t.tab.top_mm + t.tab.height_mm) * MM / h_in),
+        (t.tab.width_mm * MM) / w_in, (t.tab.height_mm * MM) / h_in,
+        transform=fig.transFigure, facecolor=t.tab.color, edgecolor="none", zorder=5,
+    )
+    fig.add_artist(rect)
+    fig._hegevis_tab = rect
+    return rect
+
+
+def _check_words(kind: str, s: str, limit: int) -> None:
+    """Warn when a piece of furniture is running long.
+
+    Not truncated: cutting an analyst's title silently would be worse than
+    shipping a long one. The warning puts the decision back with the person who
+    can actually make it, before the chart reaches the page.
+    """
+    n = len(s.split())
+    if n > limit:
+        warnings.warn(
+            f"hegevis: {kind} is {n} words, over the house limit of {limit}. "
+            "A chart carries a headline, not a paragraph - cut it, or move the "
+            "detail into the body text.",
+            stacklevel=3,
+        )
 
 
 def _apply_margins(fig, t: Theme, extra_top_in=0.0, extra_bottom_in=0.0):
@@ -103,12 +154,6 @@ def _apply_margins(fig, t: Theme, extra_top_in=0.0, extra_bottom_in=0.0):
     extra_left_in = getattr(fig, "_hegevis_label_left_in", 0.0)
     # A legend above the plot needs its own band, or the title lands on it.
     extra_top_in = extra_top_in + getattr(fig, "_hegevis_legend_top_in", 0.0)
-    # The masthead mark sits in the bottom-right corner. This is a floor, not
-    # an addition: the default bottom margin usually already clears it, and a
-    # source line pushes the plot further up than the mark ever does.
-    if _logo.has_logo(fig):
-        extra_bottom_in = max(extra_bottom_in,
-                              _logo.reserved_bottom_in(t) - m.bottom * MM)
     fig.subplots_adjust(
         left=(m.left * MM + extra_left_in) / w_in,
         right=1 - (m.right * MM + extra_right_in) / w_in,
@@ -128,22 +173,32 @@ def finish(fig, *, title=None, subtitle=None, source=None, note=None,
 
     ``source`` is prefixed "Source: " automatically; pass the bare citation.
 
-    The masthead mark is added here if the figure does not already carry it --
+    The masthead tab is added here if the figure does not already carry it --
     it is furniture like the source line, not something to opt into.
     """
     t = theme or get_theme()
-    _logo.stamp(fig, t)
+    _tab(fig, t)
+    if title:
+        _check_words("title", title, t.text.title_words)
+    if subtitle:
+        _check_words("subtitle", subtitle, t.text.subtitle_words)
+    if source or note:
+        _check_words("footnote", " ".join(filter(None, (source, note))),
+                     t.text.footnote_words)
     w_in, h_in = fig.get_size_inches()
     m = t.layout.margin
     text_w_in = w_in - (m.left + m.right) * MM
-    # The footer shares its band with the mark, so it wraps to a shorter
-    # measure than the title does. Floored, so an outsized logo in a hand-
-    # edited theme cannot squeeze the source line down to one word a line.
-    foot_w_in = max(text_w_in - _logo.size_in(t)[0] - t.logo.gap_mm * MM,
-                    text_w_in * 0.4)
+    # The footer now has the full measure to itself: nothing else sits in the
+    # bottom band.
+    foot_w_in = text_w_in
 
     # -- top block: title then subtitle -------------------------------------
-    title_lines = wrap(fig, title, text_w_in, t.size.title, t.weight_bold) if title else []
+    # The title takes the display face; everything below it stays in the sans.
+    # The house sans is appended as a last resort so an unlicensed machine
+    # degrades to the chart face rather than to matplotlib's DejaVu.
+    title_family = list(t.titles) + list(t.family)
+    title_lines = wrap(fig, title, text_w_in, t.size.title, t.weight_bold,
+                       title_family) if title else []
     sub_lines = wrap(fig, subtitle, text_w_in, t.size.subtitle, t.weight_normal) if subtitle else []
 
     top_in = 0.0
@@ -169,12 +224,15 @@ def finish(fig, *, title=None, subtitle=None, source=None, note=None,
     _apply_margins(fig, t, extra_top_in=reserved_top_in, extra_bottom_in=bottom_in)
 
     left = (m.left * MM) / w_in
-    y = 1 - (2.5 * MM) / h_in  # a small optical inset from the trim
+    # The title hangs off the bottom of the tab, not off the top of the box:
+    # the tab is the fixed thing, so the title lands in the same place on every
+    # chart whatever the box height.
+    y = 1 - (t.tab.top_mm + t.tab.height_mm + TAB_GAP_MM) * MM / h_in
 
     for line in title_lines:
         y -= t.size.title * LINE_SPACING * PT / h_in
         fig.text(left, y, line, fontsize=t.size.title, fontweight=t.weight_bold,
-                 color=t.ink, ha="left", va="baseline")
+                 fontfamily=title_family, color=t.ink, ha="left", va="baseline")
     if sub_lines:
         if title_lines:
             y -= BLOCK_GAP_PT * PT / h_in

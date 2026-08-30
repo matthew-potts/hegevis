@@ -80,17 +80,14 @@ def test_multi_line_charts_label_ends_by_default(frame):
     assert {"China", "United States", "European Union"} <= labelled
 
 
-def test_area_refuses_more_than_one_series(frame):
-    fig, ax = hv.figure("col1")
-    with pytest.raises(ValueError, match="single series"):
-        hv.area(ax, frame)
-
-
-def test_area_draws_a_wash_not_a_block(frame):
-    fig, ax = hv.figure("col1")
-    hv.area(ax, frame[["China"]])
-    fills = ax.collections
-    assert fills and fills[0].get_alpha() <= 0.15
+def test_only_bar_and_line_forms_are_offered():
+    """The v2 surface is five forms. Area, stacked, share and grouped bars were
+    removed on purpose -- each asked a reader to compare lengths that do not
+    share a baseline, which is the one comparison bars are good at."""
+    assert not [n for n in ("area", "stacked", "share", "grouped")
+                if hasattr(hv, n)]
+    assert all(hasattr(hv, n) for n in
+               ("ranked", "columns", "histogram", "line", "slope"))
 
 
 def test_shade_period_sits_behind_the_data(frame):
@@ -134,36 +131,86 @@ def test_bars_are_capped_in_absolute_thickness():
     assert mm <= MAX_BAR_MM + 1e-9
 
 
-def test_grouped_rejects_a_transposed_frame():
-    with pytest.raises(ValueError, match="categories"):
-        fig, ax = hv.figure("col1")
-        hv.grouped(ax, {"a": [1, 2], "b": [3, 4]}, x=[1, 2, 3])
+# -- ordered columns -----------------------------------------------------------
 
-
-def test_stacked_only_labels_segments_that_fit():
-    """A clipped or overflowing label is worse than no label."""
+def test_columns_order_biggest_first_left_to_right():
+    """The direction a reader scans, so the ranking is legible without effort."""
     fig, ax = hv.figure("col1")
-    hv.stacked(ax, {"big": [100.0], "tiny": [0.4]}, x=["only"], label_values=True)
-    texts = {t.get_text() for t in ax.texts}
-    assert "100" in texts
-    assert "0.4" not in texts
+    hv.columns(ax, ["a", "b", "c"], [1, 3, 2])
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["b", "c", "a"]
 
 
-def test_share_normalises_to_100():
-    fig, ax = hv.figure("col2")
-    hv.share(ax, {"a": [1.0, 3.0], "b": [1.0, 1.0]}, x=["x", "y"])
-    assert ax.get_xlim() == (0, 100)
-
-
-def test_share_rejects_a_zero_total():
+def test_columns_keep_other_at_the_end_whatever_its_size():
     fig, ax = hv.figure("col1")
-    with pytest.raises(ValueError, match="positive total"):
-        hv.share(ax, {"a": [0.0], "b": [0.0]}, x=["x"])
+    hv.columns(ax, ["a", "Other", "c"], [3, 99, 1])
+    assert [t.get_text() for t in ax.get_xticklabels()][-1] == "Other"
 
 
-def test_legend_sits_above_the_plot_not_on_the_data():
+def test_columns_use_one_colour_unless_told_to_highlight():
     fig, ax = hv.figure("col1")
-    hv.grouped(ax, {"a": [1, 2], "b": [2, 1]}, x=["p", "q"])
-    leg = ax.get_legend()
-    assert leg is not None
-    assert leg.get_bbox_to_anchor().y0 >= ax.get_window_extent().y1 - 1
+    hv.columns(ax, ["a", "b", "c"], [3, 2, 1])
+    assert len({tuple(p.get_facecolor()) for p in ax.patches}) == 1
+
+    fig2, ax2 = hv.figure("col1")
+    hv.columns(ax2, ["a", "b", "c"], [3, 2, 1], highlight="a")
+    assert len({tuple(p.get_facecolor()) for p in ax2.patches}) == 2
+
+
+# -- histogram -----------------------------------------------------------------
+
+def test_histogram_keeps_the_number_line_in_order():
+    """Sorting a histogram by height would destroy the shape that is the point."""
+    fig, ax = hv.figure("col1")
+    hv.histogram(ax, [1, 1, 1, 2, 2, 9], bins=3)
+    centres = [p.get_x() for p in ax.patches]
+    assert centres == sorted(centres)
+
+
+def test_histogram_bins_are_separated_by_the_ground_not_a_stroke():
+    fig, ax = hv.figure("col1")
+    hv.histogram(ax, list(range(50)), bins=5)
+    assert all(p.get_linewidth() == 0 for p in ax.patches)
+    widths = [p.get_width() for p in ax.patches]
+    edges = np.histogram(list(range(50)), bins=5)[1]
+    assert all(w < np.diff(edges)[0] for w in widths)  # the gap came out of the bar
+
+
+def test_histogram_rejects_an_empty_series():
+    fig, ax = hv.figure("col1")
+    with pytest.raises(ValueError, match="at least one finite value"):
+        hv.histogram(ax, [float("nan"), float("inf")])
+
+
+# -- slope ---------------------------------------------------------------------
+
+def test_slope_draws_one_line_per_series_between_two_points():
+    fig, ax = hv.figure("col1")
+    hv.slope(ax, {"a": (1, 5), "b": (4, 2)})
+    assert len(ax.get_lines()) == 2
+    assert all(list(ln.get_xdata()) == [0, 1] for ln in ax.get_lines())
+
+
+def test_slope_refuses_anything_other_than_two_periods():
+    fig, ax = hv.figure("col1")
+    with pytest.raises(ValueError, match="exactly two values"):
+        hv.slope(ax, {"a": (1, 2, 3)})
+
+
+def test_slope_labels_both_ends_and_keeps_them_inside_the_box():
+    """Both ends carry a label, and the margins widen so nothing is clipped."""
+    fig, ax = hv.figure("col1")
+    hv.slope(ax, {"United States of America": (1, 5), "b": (4, 2)},
+             labels=["2019", "2030"])
+    texts = [a.get_text() for a in ax.texts]
+    assert any("United States of America" in s for s in texts)
+    assert fig._hegevis_label_left_in > 0
+    assert fig._hegevis_label_right_in > 0
+
+
+def test_slope_draws_no_value_scale():
+    """The lines are the comparison; a y-axis would invite a reader to measure
+    levels off a form built to show change."""
+    fig, ax = hv.figure("col1")
+    hv.slope(ax, {"a": (1, 5)})
+    assert not any(lbl.get_visible() and lbl.get_text()
+                   for lbl in ax.get_yticklabels())

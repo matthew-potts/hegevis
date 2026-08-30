@@ -17,33 +17,34 @@ import warnings
 from contextlib import contextmanager
 
 import matplotlib as mpl
-from matplotlib import font_manager
 
+from . import fonts
 from .theme import Theme, get_theme
 
 # Print equivalents of the method's screen specs.
-LINE_PT = 1.1        # data lines ("2px")
-HAIRLINE_PT = 0.4    # gridlines, spines
+LINE_PT = 1.6        # data lines: the reference charts carry a confident stroke
+HAIRLINE_PT = 0.4    # gridlines
+BASELINE_PT = 0.8    # the zero/category baseline is real ink, not a hairline
 MARKER_PT = 4.0      # marker size ("8px" diameter)
-SURFACE_GAP_PT = 1.0  # the 2px surface gap between touching fills
+SURFACE_GAP_PT = 1.0  # the surface gap between touching fills
 
 _font_warned = False
 
 
 def resolve_font(families) -> tuple[str, list[str]]:
-    """Return (first installed family, the ones that were missing).
+    """Return (first available family, the ones that were missing).
+
+    Registers the licensed faces from ``assets/fonts/`` first, so a machine
+    with the zip unpacked into the package works the same as one with the
+    faces installed system-wide.
 
     Falls back to matplotlib's bundled DejaVu Sans rather than failing -- a
     missing brand font should not stop an analyst working, but it must not pass
     silently either, or a chart ships in the wrong face.
     """
-    installed = {f.name for f in font_manager.fontManager.ttflist}
-    missing = []
-    for fam in families:
-        if fam in installed:
-            return fam, missing
-        missing.append(fam)
-    return "DejaVu Sans", missing
+    fonts.register()
+    found, missing = fonts.available(families)
+    return (found or "DejaVu Sans"), missing
 
 
 def rc_params(theme: Theme | None = None) -> dict:
@@ -57,7 +58,8 @@ def rc_params(theme: Theme | None = None) -> dict:
             f"hegevis: font {missing[0]!r} is not installed"
             + (f" (nor {', '.join(repr(m) for m in missing[1:])})" if len(missing) > 1 else "")
             + f"; falling back to {body!r}. Charts will NOT be in the house face. "
-            "Install the brand font, or edit [type].family in the theme file.",
+            "Drop the licensed faces into src/hegevis/assets/fonts/, install them "
+            "system-wide, or edit [type].family in the theme file.",
             stacklevel=3,
         )
 
@@ -65,7 +67,7 @@ def rc_params(theme: Theme | None = None) -> dict:
         # -- type ------------------------------------------------------------
         "font.family": "sans-serif",
         "font.sans-serif": [body, *t.family, "DejaVu Sans"],
-        "font.size": t.size.tick,
+        "font.size": t.size.body,
         "font.weight": t.weight_normal,
 
         # -- figure & surface -------------------------------------------------
@@ -101,10 +103,10 @@ def rc_params(theme: Theme | None = None) -> dict:
         "axes.titlecolor": t.ink,
         "axes.titlelocation": "left",
         "axes.titlepad": 6.0,
-        "axes.labelsize": t.size.axis,
+        "axes.labelsize": t.size.body,
         "axes.labelcolor": t.ink_muted,
         "axes.labelweight": t.weight_normal,
-        "axes.linewidth": HAIRLINE_PT,
+        "axes.linewidth": BASELINE_PT,
         "axes.spines.top": False,
         "axes.spines.right": False,
         "axes.spines.left": False,   # the gridlines carry the scale
@@ -122,21 +124,28 @@ def rc_params(theme: Theme | None = None) -> dict:
         "grid.alpha": 1.0,
 
         # -- ticks ------------------------------------------------------------
+        # The value scale is labelled on the RIGHT, following the house charts:
+        # a reader scanning a line to its latest value finds the number where
+        # the line ends, instead of tracking back across the plot.
         "xtick.color": t.axis,
         "xtick.labelcolor": t.ink_muted,
-        "xtick.labelsize": t.size.tick,
+        "xtick.labelsize": t.size.body,
         "xtick.direction": "out",
-        "xtick.major.size": 2.5,
-        "xtick.major.width": HAIRLINE_PT,
+        "xtick.major.size": 3.0,
+        "xtick.major.width": BASELINE_PT,
         "xtick.minor.size": 1.5,
         "xtick.major.pad": 3.0,
         "ytick.color": t.axis,
         "ytick.labelcolor": t.ink_muted,
-        "ytick.labelsize": t.size.tick,
+        "ytick.labelsize": t.size.body,
         "ytick.direction": "out",
         "ytick.major.size": 0.0,   # gridlines already mark the scale
         "ytick.major.width": 0.0,
         "ytick.major.pad": 3.0,
+        "ytick.left": False,
+        "ytick.right": True,
+        "ytick.labelleft": False,
+        "ytick.labelright": True,
 
         # -- marks ------------------------------------------------------------
         "lines.linewidth": LINE_PT,
@@ -152,7 +161,7 @@ def rc_params(theme: Theme | None = None) -> dict:
 
         # -- legend: never a box, never a shadow ------------------------------
         "legend.frameon": False,
-        "legend.fontsize": t.size.legend,
+        "legend.fontsize": t.size.body,
         "legend.labelcolor": t.ink_soft,
         "legend.handlelength": 1.2,
         "legend.handletextpad": 0.5,

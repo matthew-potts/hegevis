@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hegevis"
-version = "0.1.0"
+version = "0.2.0"
 description = "House data-visualisation style for the geoeconomics publication: consistent colour, type and chart furniture across every article."
 readme = "README.md"
 requires-python = ">=3.11"

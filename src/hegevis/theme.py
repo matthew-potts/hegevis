@@ -31,13 +31,68 @@ MM = 1 / 25.4  # millimetres -> inches, matplotlib's unit
 
 @dataclass(frozen=True)
 class TypeScale:
-    title: float = 10.5
-    subtitle: float = 9.0
-    axis: float = 7.5
-    tick: float = 7.5
-    label: float = 7.5
-    legend: float = 7.5
-    source: float = 6.5
+    """Four sizes, and only one of them is used inside the plot.
+
+    The old scale had separate axis/tick/label/legend sizes that all happened
+    to be 7.5pt anyway. Naming them separately invited them to drift apart,
+    which is how a chart ends up with four text sizes and no hierarchy. There
+    is now one ``body`` size for everything in the plot area; ``axis``,
+    ``tick``, ``label`` and ``legend`` remain as aliases so existing code and
+    themes keep working, but they all report ``body``.
+    """
+
+    title: float = 10.0
+    subtitle: float = 8.5
+    body: float = 7.0
+    footnote: float = 5.5
+
+    @property
+    def axis(self) -> float:
+        return self.body
+
+    @property
+    def tick(self) -> float:
+        return self.body
+
+    @property
+    def label(self) -> float:
+        return self.body
+
+    @property
+    def legend(self) -> float:
+        return self.body
+
+    @property
+    def source(self) -> float:
+        return self.footnote
+
+
+@dataclass(frozen=True)
+class Tab:
+    """The solid rectangle that opens every chart, top-left above the title.
+
+    Its colour lives here rather than beside the data colours because it is
+    never a data colour: it is a fixed piece of masthead, the same on every
+    chart, and putting it in the series list would invite someone to use it.
+    """
+
+    width_mm: float = 14.0
+    height_mm: float = 2.2
+    top_mm: float = 4.5
+    color: str = "#d1703a"
+
+
+@dataclass(frozen=True)
+class TextLimits:
+    """Word ceilings for the furniture, warned about rather than truncated.
+
+    Cutting an analyst's title silently would be worse than shipping a long
+    one; the warning puts the decision back where it belongs.
+    """
+
+    title_words: int = 8
+    subtitle_words: int = 14
+    footnote_words: int = 20
 
 
 @dataclass(frozen=True)
@@ -54,7 +109,7 @@ class Layout:
     col15: float = 120.0
     col2: float = 180.0
     page: float = 180.0
-    default_ratio: float = 0.618
+    default_ratio: float = 1.15  # portrait: a chart is a box, taller than wide
     margin: Margin = field(default_factory=Margin)
 
     def width_mm(self, size) -> float:
@@ -68,20 +123,6 @@ class Layout:
             raise ValueError(
                 f"unknown size {size!r} - use one of {names}, or a width in mm"
             ) from None
-
-
-@dataclass(frozen=True)
-class Logo:
-    """Where the masthead mark sits and how big it is, in millimetres.
-
-    There is no on/off switch here on purpose: the mark is house furniture, the
-    same as the source line. See :mod:`hegevis.logo`.
-    """
-
-    height_mm: float = 7.0
-    inset_mm: float = 2.5   # from the trim, matching the source line's inset
-    gap_mm: float = 4.0     # clear space between the footer text and the mark
-    path: str = ""          # override the packaged asset; "" uses it
 
 
 @dataclass(frozen=True)
@@ -109,7 +150,8 @@ class Theme:
     status: dict = field(default_factory=dict)
     entities: dict = field(default_factory=dict)
     layout: Layout = field(default_factory=Layout)
-    logo: Logo = field(default_factory=Logo)
+    tab: Tab = field(default_factory=Tab)
+    text: TextLimits = field(default_factory=TextLimits)
     cmyk: dict = field(default_factory=dict)
     source_path: Path | None = None
 
@@ -143,10 +185,23 @@ def read_theme(path: str | Path) -> Theme:
     c = raw.get("color", {})
     lay = raw.get("layout", {})
     marg = lay.get("margin", {})
-    lg = raw.get("logo", {})
+    tb = raw.get("tab", {})
+    txt = raw.get("text", {})
 
     known = {f.name for f in (TypeScale.__dataclass_fields__.values())}
-    unknown = set(sizes) - known
+    # The per-role sizes collapsed into one `body`. A theme still naming them
+    # is not broken, it is out of date, and silently ignoring the keys would
+    # leave someone wondering why their edit did nothing.
+    retired = {"axis", "tick", "label", "legend", "source"}
+    stale = retired & set(sizes)
+    if stale:
+        warnings.warn(
+            f"{path.name}: [type.size] {', '.join(sorted(stale))} no longer exist - "
+            "everything inside the plot is one size now, set [type.size] body "
+            "(and footnote for the source line).",
+            stacklevel=2,
+        )
+    unknown = set(sizes) - known - retired
     if unknown:
         warnings.warn(
             f"{path.name}: ignoring unknown [type.size] key(s): {', '.join(sorted(unknown))}",
@@ -189,11 +244,17 @@ def read_theme(path: str | Path) -> Theme:
                 bottom=float(marg.get("bottom", 11.0)),
             ),
         ),
-        logo=Logo(
-            height_mm=float(lg.get("height_mm", 7.0)),
-            inset_mm=float(lg.get("inset_mm", 2.5)),
-            gap_mm=float(lg.get("gap_mm", 4.0)),
-            path=str(lg.get("path", "")),
+        tab=Tab(
+            width_mm=float(tb.get("width_mm", 14.0)),
+            height_mm=float(tb.get("height_mm", 2.2)),
+            top_mm=float(tb.get("top_mm", 4.5)),
+            # Declared with the colours, where an art director looks for it.
+            color=_hex(c.get("tab", "#d1703a"), "color.tab"),
+        ),
+        text=TextLimits(
+            title_words=int(txt.get("title_words", 8)),
+            subtitle_words=int(txt.get("subtitle_words", 14)),
+            footnote_words=int(txt.get("footnote_words", 20)),
         ),
         cmyk={strip_ws(k).lower(): tuple(v) for k, v in raw.get("cmyk", {}).items()},
         source_path=path,

@@ -1,4 +1,7 @@
-"""Every v1 chart form, with illustrative (synthetic) geoeconomics data.
+"""Every v2 chart form, with illustrative (synthetic) geoeconomics data.
+
+Five forms and no more: ranked rows, ordered columns, a histogram, a time
+series and a slope chart.
 
 Run: python examples/gallery.py
 Writes PDFs to examples/out/ plus PNG proofs for on-screen review.
@@ -18,49 +21,45 @@ def _drift(n, start, rate, vol):
     return start * np.exp(steps / 100)
 
 
-def timeseries_indexed():
+def timeseries():
     years = pd.period_range("2015", "2024", freq="Y").to_timestamp()
     df = pd.DataFrame({
         "China": _drift(len(years), 100, 3.4, 2.2),
         "United States": _drift(len(years), 100, 1.9, 1.8),
         "European Union": _drift(len(years), 100, 1.1, 2.0),
-        "India": _drift(len(years), 100, 5.0, 2.6),
     }, index=years)
 
-    fig, ax = hv.figure("col2", ratio=0.52)
+    fig, ax = hv.figure("col1")
     xs, indexed = hv.index_to(df)
     hv.line(ax, indexed, x=xs)
     hv.shade_period(ax, pd.Timestamp("2020-01-01"), pd.Timestamp("2021-06-01"),
                     label="Pandemic")
-    ax.set_ylabel("Index, 2015 = 100")
     hv.finish(
         fig,
-        title="Goods exports diverge after the pandemic",
-        subtitle="Merchandise exports by reporter, indexed to 2015 = 100",
+        title="Goods exports diverge",
+        subtitle="Merchandise exports, 2015 = 100",
         source="Illustrative synthetic data",
-        note="Shaded: Feb 2020 - Jun 2021.",
     )
-    hv.save(fig, f"{OUT}/01-timeseries-indexed.pdf", manifest=True)
-    fig.savefig(f"{OUT}/01-timeseries-indexed.png", dpi=200)
+    hv.save(fig, f"{OUT}/01-timeseries.pdf")
+    fig.savefig(f"{OUT}/01-timeseries.png", dpi=200)
     return fig
 
 
-def timeseries_emphasis():
+def emphasis():
     years = pd.period_range("2010", "2024", freq="Y").to_timestamp()
-    names = ["Russia", "Brazil", "Turkey", "Indonesia", "South Africa"]
+    names = ["Russia", "Brazil", "Turkey", "Indonesia"]
     df = pd.DataFrame(
         {n: _drift(len(years), 100, r, 3.0)
-         for n, r in zip(names, [-1.2, 1.4, 0.6, 2.1, 0.3])},
+         for n, r in zip(names, [-1.2, 1.4, 0.6, 2.1])},
         index=years,
     )
 
-    fig, ax = hv.figure("col1", ratio=0.72)
+    fig, ax = hv.figure("col1")
     hv.line(ax, df, emphasis="Russia")
-    ax.set_ylabel("Share of G20 trade, index")
     hv.finish(
         fig,
         title="Russia's trade share falls away",
-        subtitle="Selected G20 economies, 2010 = 100",
+        subtitle="Selected economies, 2010 = 100",
         source="Illustrative synthetic data",
     )
     hv.save(fig, f"{OUT}/02-emphasis.pdf")
@@ -68,90 +67,76 @@ def timeseries_emphasis():
     return fig
 
 
-def ranked_bars():
+def ranked_rows():
     data = {
-        "China": 3380, "United States": 2020, "Germany": 1690, "Netherlands": 940,
-        "Japan": 917, "South Korea": 683, "Italy": 676, "France": 648,
-        "Belgium": 633, "Mexico": 593,
+        "China": 3380, "United States": 2020, "Germany": 1690,
+        "Netherlands": 940, "Japan": 917, "South Korea": 683, "Italy": 676,
     }
-    kept = hv.fold_other(list(data.items()), keep=8)
-
-    fig, ax = hv.figure("col1", ratio=1.05)
-    hv.ranked(ax, [k for k, _ in kept], [v for _, v in kept],
-              highlight="China", unit="")
-    ax.set_xlabel("Goods exports, $bn")
+    fig, ax = hv.figure("col1")
+    hv.ranked(ax, list(data), list(data.values()), highlight="China")
     hv.finish(
         fig,
-        title="China leads goods exports by a wide margin",
+        title="China leads goods exports",
         subtitle="Merchandise exports, $bn",
         source="Illustrative synthetic data",
-        note="Tail of the top 10 folded into 'Other'.",
     )
     hv.save(fig, f"{OUT}/03-ranked.pdf")
     fig.savefig(f"{OUT}/03-ranked.png", dpi=200)
     return fig
 
 
-def grouped_columns():
-    df = pd.DataFrame({
-        "2019": [61.8, 20.6, 5.4, 4.4],
-        "2024": [58.2, 19.8, 5.7, 5.9],
-    }, index=["USD", "EUR", "JPY", "GBP"])
-
-    fig, ax = hv.figure("col1", ratio=0.68)
-    hv.grouped(ax, df)
-    ax.set_ylabel("Share of allocated reserves, %")
+def ordered_columns():
+    data = {"USD": 58.2, "EUR": 19.8, "JPY": 5.7, "GBP": 4.9, "CNY": 2.3}
+    fig, ax = hv.figure("col1")
+    hv.columns(ax, list(data), list(data.values()), unit="%")
     hv.finish(
         fig,
-        title="Reserve shares move slowly",
-        subtitle="Currency composition of allocated FX reserves, %",
+        title="The dollar still dominates reserves",
+        subtitle="Share of allocated FX reserves, %",
         source="Illustrative synthetic data",
     )
-    hv.save(fig, f"{OUT}/04-grouped.pdf")
-    fig.savefig(f"{OUT}/04-grouped.png", dpi=200)
+    hv.save(fig, f"{OUT}/04-columns.pdf")
+    fig.savefig(f"{OUT}/04-columns.png", dpi=200)
     return fig
 
 
-def share_bars():
-    df = pd.DataFrame({
-        "Taiwan": [68, 62, 55],
-        "South Korea": [12, 15, 17],
-        "United States": [8, 11, 15],
-        "Japan": [7, 7, 8],
-        "Other": [5, 5, 5],
-    }, index=["2019", "2024", "2030 (proj.)"])
-
-    fig, ax = hv.figure("col2", ratio=0.42)
-    hv.share(ax, df)
+def distribution():
+    tariffs = np.concatenate([
+        rng.gamma(2.0, 3.0, 400),
+        rng.normal(22, 4, 60),
+    ])
+    fig, ax = hv.figure("col1")
+    hv.histogram(ax, tariffs)
+    ax.set_xlabel("Applied tariff rate, %")
     hv.finish(
         fig,
-        title="Leading-edge fabrication slowly diversifies",
+        title="Most tariffs are low, a few are not",
+        subtitle="Applied MFN rates across tariff lines",
+        source="Illustrative synthetic data",
+    )
+    hv.save(fig, f"{OUT}/05-histogram.pdf")
+    fig.savefig(f"{OUT}/05-histogram.png", dpi=200)
+    return fig
+
+
+def slope_chart():
+    data = {
+        "Taiwan": (68, 55),
+        "South Korea": (12, 17),
+        "United States": (8, 15),
+        "Japan": (7, 8),
+    }
+    fig, ax = hv.figure("col1")
+    hv.slope(ax, data, labels=["2019", "2030"], unit="%",
+             emphasis="United States")
+    hv.finish(
+        fig,
+        title="Fabrication slowly diversifies",
         subtitle="Share of sub-7nm foundry capacity, %",
         source="Illustrative synthetic data",
     )
-    hv.save(fig, f"{OUT}/05-share.pdf")
-    fig.savefig(f"{OUT}/05-share.png", dpi=200)
-    return fig
-
-
-def stacked_columns():
-    df = pd.DataFrame({
-        "Tariffs": [12, 19, 31, 44, 51],
-        "Export controls": [4, 9, 18, 33, 47],
-        "Investment screening": [3, 6, 11, 16, 22],
-    }, index=["2020", "2021", "2022", "2023", "2024"])
-
-    fig, ax = hv.figure("col1", ratio=0.7)
-    hv.stacked(ax, df, label_values=True)
-    ax.set_ylabel("Measures in force")
-    hv.finish(
-        fig,
-        title="Restrictive measures keep accumulating",
-        subtitle="New measures in force, by instrument",
-        source="Illustrative synthetic data",
-    )
-    hv.save(fig, f"{OUT}/06-stacked.pdf")
-    fig.savefig(f"{OUT}/06-stacked.png", dpi=200)
+    hv.save(fig, f"{OUT}/06-slope.pdf")
+    fig.savefig(f"{OUT}/06-slope.png", dpi=200)
     return fig
 
 
@@ -159,7 +144,7 @@ if __name__ == "__main__":
     import pathlib
     pathlib.Path(OUT).mkdir(parents=True, exist_ok=True)
     hv.use()
-    for fn in (timeseries_indexed, timeseries_emphasis, ranked_bars,
-               grouped_columns, share_bars, stacked_columns):
+    for fn in (timeseries, emphasis, ranked_rows, ordered_columns,
+               distribution, slope_chart):
         fn()
         print("ok:", fn.__name__)

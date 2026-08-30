@@ -29,8 +29,13 @@ The house rules the package enforces for you, so nobody has to remember them:
   never cycled past the eighth slot
 * no dual-axis charts -- use :func:`index_to` to put two magnitudes on one axis
 * figures are built at true printed width, so type lands at the size it is set
-* every chart carries the masthead mark, bottom-right -- it is furniture, not
-  an option, so a chart that travels away from its article still says whose it is
+* every chart is a BOX: off-white ground edge to edge, slightly taller than
+  wide, opening with the masthead tab top-left. Nothing is drawn on white. The
+  tab is the whole of the branding -- it costs 2mm and no chart real estate
+* five forms only -- ``ranked``, ``columns``, ``histogram``, ``line``,
+  ``slope``. If it is not a bar or a line, it is not a house form
+* one text size inside the plot, and the footnote is much smaller. Title and
+  subtitle are held to a word count and warn when they run long
 
 Changing the look for everyone is one file: ``house_theme.toml``.
 """
@@ -38,37 +43,32 @@ Changing the look for everyone is one file: ``house_theme.toml``.
 from __future__ import annotations
 
 from .charts import (
-    add_end_labels, area, grouped, index_to, line, ranked, shade_period, share,
-    stacked,
+    add_end_labels, columns, histogram, index_to, line, ranked, shade_period,
+    slope,
 )
 from .color import contrast, delta_e, oklch, simulate_hex
 from .export import cmyk_manifest, colors_used, save, simulate_figure
 from .layout import figure, finish
-from .logo import MissingLogo
-from .logo import resolve_path as logo_path
-from .logo import stamp as stamp_logo
 from .palette import Palette, TooManySeries, default_palette, fold_other
 from .rc import rc_params, style, use
-from .theme import Logo, Theme, get_theme, load_theme, set_theme
+from .theme import Tab, TextLimits, Theme, get_theme, load_theme, set_theme
 from .validate import PaletteError, validate, validate_ordinal
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     # style
     "use", "style", "rc_params",
     # theme
-    "Theme", "Logo", "get_theme", "load_theme", "set_theme",
+    "Theme", "Tab", "TextLimits", "get_theme", "load_theme", "set_theme",
     # colour
     "Palette", "default_palette", "fold_other", "TooManySeries",
     "contrast", "delta_e", "oklch", "simulate_hex",
     # figures
     "figure", "finish",
-    # the masthead mark -- applied automatically; these are for hand-built figures
-    "stamp_logo", "logo_path", "MissingLogo",
-    # charts
-    "line", "area", "index_to", "shade_period", "add_end_labels",
-    "ranked", "grouped", "stacked", "share",
+    # charts: five forms, then the annotation helpers
+    "ranked", "columns", "histogram", "line", "slope",
+    "index_to", "shade_period", "add_end_labels",
     # output
     "save", "cmyk_manifest", "colors_used", "simulate_figure",
     # checks
