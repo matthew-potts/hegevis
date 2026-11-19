@@ -32,8 +32,9 @@ The house rules the package enforces for you, so nobody has to remember them:
 * every chart is a BOX: off-white ground edge to edge, slightly taller than
   wide, opening with the masthead tab top-left. Nothing is drawn on white. The
   tab is the whole of the branding -- it costs 2mm and no chart real estate
-* five forms only -- ``ranked``, ``columns``, ``histogram``, ``line``,
-  ``slope``. If it is not a bar or a line, it is not a house form
+* seven forms only -- ``ranked``, ``columns``, ``histogram``, ``line``,
+  ``slope``, ``dumbbell`` and ``timeline``. If it is not a bar, a line, a pair
+  of points on one, or dated milestones, it is not a house form
 * one text size inside the plot, and the footnote is much smaller. Title and
   subtitle are held to a word count and warn when they run long
 
@@ -43,8 +44,8 @@ Changing the look for everyone is one file: ``house_theme.toml``.
 from __future__ import annotations
 
 from .charts import (
-    add_end_labels, columns, histogram, index_to, line, ranked, shade_period,
-    slope,
+    add_end_labels, columns, dumbbell, histogram, index_to, line, ranked,
+    shade_period, slope, timeline,
 )
 from .color import contrast, delta_e, oklch, simulate_hex
 from .export import cmyk_manifest, colors_used, save, simulate_figure
@@ -66,8 +67,8 @@ __all__ = [
     "contrast", "delta_e", "oklch", "simulate_hex",
     # figures
     "figure", "finish",
-    # charts: five forms, then the annotation helpers
-    "ranked", "columns", "histogram", "line", "slope",
+    # charts: seven forms, then the annotation helpers
+    "ranked", "columns", "histogram", "line", "slope", "dumbbell", "timeline",
     "index_to", "shade_period", "add_end_labels",
     # output
     "save", "cmyk_manifest", "colors_used", "simulate_figure",

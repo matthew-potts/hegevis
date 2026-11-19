@@ -19,6 +19,7 @@ from ..palette import default_palette
 from ..theme import MM, get_theme
 
 MAX_BAR_MM = 6.5      # absolute cap on bar thickness in print
+MAX_SLOT_MM = 14.0    # absolute cap on bar pitch (bar + gap) in print
 SLOT_FILL = 0.62      # of the band, so the leftover is air
 GAP_PT = 1.0          # the surface gap between touching fills
 LABEL_PAD_PT = 3.0
@@ -36,6 +37,26 @@ def _thickness(ax, n_slots: int, axis: str, max_mm=MAX_BAR_MM) -> float:
     extent_mm = _axis_extent_mm(ax, axis)
     slot_mm = extent_mm / max(n_slots, 1)
     return min(SLOT_FILL, max_mm / slot_mm) if slot_mm else SLOT_FILL
+
+
+def _cap_slots(ax, n_slots: int, axis: str, max_mm=MAX_SLOT_MM) -> float:
+    """Keep a short ranking together instead of spreading it over the box.
+
+    Three bars dealt across a full-height plot sit so far apart they stop
+    reading as one comparison. Past the cap, the axis is padded symmetrically
+    so the bars cluster mid-plot at a fixed pitch and the box keeps its shape.
+
+    Returns the slot pitch in millimetres, capped or not.
+    """
+    extent_mm = _axis_extent_mm(ax, axis)
+    slot_mm = extent_mm / max(n_slots, 1)
+    if slot_mm <= max_mm:
+        return slot_mm
+    span = extent_mm / max_mm
+    mid = (n_slots - 1) / 2
+    set_lim = ax.set_ylim if axis == "y" else ax.set_xlim
+    set_lim(mid - span / 2, mid + span / 2)
+    return max_mm
 
 
 def _renderer(fig):
@@ -114,7 +135,7 @@ def _bar_colors(names, base, highlight, t):
 
 def ranked(ax, labels, values, *, palette=None, color=None, theme=None,
            sort=True, unit="", label_values=True, highlight=None,
-           last=("Other",)):
+           last=("Other",), tip_labels=None):
     """Ranked horizontal bars -- the right form for "who is biggest".
 
     Horizontal because country and bloc names are long: a horizontal bar gives
@@ -122,6 +143,11 @@ def ranked(ax, labels, values, *, palette=None, color=None, theme=None,
 
     ``highlight`` names bars to keep in colour while the rest drop to grey --
     emphasis, for when the story is about one country in a ranking.
+
+    ``tip_labels`` replaces the printed value at each bar's tip, one string per
+    label in the order given -- for values the source only states loosely
+    ("~75%", "Almost two-thirds"), where printing the plotted number would
+    claim a precision the data does not have.
     """
     t = theme or get_theme()
     pal = palette or default_palette(t)
@@ -131,7 +157,8 @@ def ranked(ax, labels, values, *, palette=None, color=None, theme=None,
     pos = np.arange(len(rows))
 
     colors = _bar_colors(names, color or pal.slot(0), highlight, t)
-    ax.barh(pos, vals, height=_thickness(ax, len(rows), "y"),
+    slot_mm = _cap_slots(ax, len(rows), "y")
+    ax.barh(pos, vals, height=min(SLOT_FILL, MAX_BAR_MM / slot_mm),
             color=colors, linewidth=0, zorder=3)
 
     ax.set_yticks(pos, names)
@@ -145,13 +172,14 @@ def ranked(ax, labels, values, *, palette=None, color=None, theme=None,
     ax.set_axisbelow(True)
 
     if label_values:
-        _label_bar_tips(ax, pos, vals, t, unit=unit, horizontal=True)
+        _label_bar_tips(ax, pos, vals, t, unit=unit, horizontal=True,
+                        texts=_tip_texts(labels, tip_labels, names))
     return ax
 
 
 def columns(ax, labels, values, *, palette=None, color=None, theme=None,
             sort=True, unit="", label_values=True, highlight=None,
-            last=("Other",)):
+            last=("Other",), tip_labels=None):
     """Ordered vertical bars -- a ranking where the labels are short.
 
     The same form as :func:`ranked`, turned on its side. Use it when the
@@ -179,7 +207,8 @@ def columns(ax, labels, values, *, palette=None, color=None, theme=None,
     ax.set_axisbelow(True)
 
     if label_values:
-        _label_bar_tips(ax, pos, vals, t, unit=unit, horizontal=False)
+        _label_bar_tips(ax, pos, vals, t, unit=unit, horizontal=False,
+                        texts=_tip_texts(labels, tip_labels, names))
     return ax
 
 
@@ -219,16 +248,28 @@ def histogram(ax, values, *, bins="auto", limits=None, palette=None, color=None,
     return ax
 
 
-def _label_bar_tips(ax, pos, vals, t, *, unit="", horizontal=True):
+def _tip_texts(labels, tip_labels, names):
+    """Caller's tip labels, re-ordered to follow the bars after sorting."""
+    if tip_labels is None:
+        return None
+    labels, tip_labels = [str(l) for l in labels], list(tip_labels)
+    if len(tip_labels) != len(labels):
+        raise ValueError("tip_labels needs one entry per bar")
+    by_name = dict(zip(labels, tip_labels))
+    return [by_name[n] for n in names]
+
+
+def _label_bar_tips(ax, pos, vals, t, *, unit="", horizontal=True, texts=None):
     """Values at the tip, outside the bar, never clipped by the axis."""
     lo, hi = (ax.get_xlim() if horizontal else ax.get_ylim())
     span = hi - lo
-    for p, v in zip(pos, vals):
+    texts = texts or [_fmt(v, unit) for v in vals]
+    for p, v, text in zip(pos, vals, texts):
         outside = v >= 0
         offset = LABEL_PAD_PT if outside else -LABEL_PAD_PT
         xy = (v, p) if horizontal else (p, v)
         ax.annotate(
-            _fmt(v, unit), xy=xy, xycoords="data",
+            text, xy=xy, xycoords="data",
             xytext=(offset, 0) if horizontal else (0, offset),
             textcoords="offset points",
             ha=("left" if outside else "right") if horizontal else "center",

@@ -1,22 +1,27 @@
 """House chart forms. Each takes an ``ax`` and returns it, so they compose with
 plain matplotlib -- drop to raw mpl for anything the helpers do not cover.
 
-Five forms, deliberately. Bars for magnitude (``ranked``, ``columns``) and
+Seven forms, deliberately. Bars for magnitude (``ranked``, ``columns``) and
 distribution (``histogram``); lines for change over time (``line``) and change
-between two moments (``slope``). Anything that is not a bar or a line is not a
+between two moments (``slope``), or the same change read against a value axis
+(``dumbbell``). ``timeline`` is the one form with no scale at all: dated
+milestones that share a story but not a unit. Anything that is not a bar or a line is not a
 house form, which is why area, stacked and 100%-stacked bars are gone.
 
 The annotation helpers -- ``index_to``, ``shade_period``, ``add_end_labels``,
-``fold_other`` -- are not forms and are unaffected: they make the five forms
+``fold_other`` -- are not forms and are unaffected: they make the forms
 readable.
 """
 
 from .bars import columns, histogram, ranked
+from .dumbbell import dumbbell
+from .timeline import timeline
 from .timeseries import add_end_labels, index_to, line, shade_period, slope
 
 __all__ = [
     # forms
-    "ranked", "columns", "histogram", "line", "slope",
+    "ranked", "columns", "histogram", "line", "slope", "dumbbell",
+    "timeline",
     # helpers
     "add_end_labels", "index_to", "shade_period",
 ]

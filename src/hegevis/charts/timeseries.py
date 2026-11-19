@@ -257,7 +257,8 @@ def _ytick_label_width(ax, renderer, t) -> float:
 
 
 def slope(ax, data, *, labels=None, palette=None, emphasis=None, theme=None,
-          unit="", label_values=True):
+          unit="", label_values=True, value_labels=None, value_axis=False,
+          name_side="start"):
     """A slope chart: two points in time, one line each, ranked at both ends.
 
     The right form for "who moved, and in which direction" across exactly two
@@ -266,6 +267,18 @@ def slope(ax, data, *, labels=None, palette=None, emphasis=None, theme=None,
 
     ``data`` maps each name to its ``(start, end)`` pair. ``labels`` names the
     two periods for the axis; it defaults to "Before" and "After".
+
+    ``value_labels`` maps a name to the ``(start, end)`` text printed in place
+    of its values -- for a source that gives a range ("0.20-0.25%") where the
+    line has to be drawn at a single point, or to carry the size of the move.
+    Names left out keep their formatted values.
+
+    ``value_axis`` adds a value scale and gridlines on the left, for when the
+    levels matter as well as the change. The start labels then move inside the
+    plot, between the scale and the lines, so the two never collide.
+
+    ``name_side`` puts the series names at the "start" (default) or "end" of
+    the lines -- the end reads better when the story is where things finished.
     """
     t = theme or get_theme()
     pal = palette or default_palette(t)
@@ -279,6 +292,8 @@ def slope(ax, data, *, labels=None, palette=None, emphasis=None, theme=None,
             "length. For more than two periods use line()."
         )
 
+    if name_side not in ("start", "end"):
+        raise ValueError(f'name_side must be "start" or "end", not {name_side!r}')
     names = list(pairs)
     colors = pal.emphasis(names, emphasis) if emphasis else pal.for_series(names)
     lead = set([emphasis] if isinstance(emphasis, str) else (emphasis or []))
@@ -293,14 +308,30 @@ def slope(ax, data, *, labels=None, palette=None, emphasis=None, theme=None,
                 solid_capstyle="round")
 
     ax.set_xlim(-0.04, 1.04)
+    if value_labels:
+        unknown = set(map(str, value_labels)) - set(names)
+        if unknown:
+            raise ValueError(f"value_labels names series not in data: {sorted(unknown)}")
+        bad = [k for k, v in value_labels.items() if len(v) != 2]
+        if bad:
+            raise ValueError(f"value_labels needs a (start, end) pair - {bad} did not")
     _label_slope_ends(ax, pairs, colors, lead, t, unit=unit,
-                      label_values=label_values)
+                      label_values=label_values,
+                      value_labels={str(k): v for k, v in (value_labels or {}).items()},
+                      inside_start=value_axis, name_side=name_side)
     ax.set_xticks([0, 1], list(labels) if labels else ["Before", "After"])
-    # No value scale and no gridlines: the lines ARE the comparison, and a slope
-    # chart with a y-axis invites a reader to measure levels off a form built to
-    # show change.
-    ax.grid(False)
-    ax.tick_params(axis="y", length=0, labelleft=False, labelright=False)
+    if value_axis:
+        from matplotlib.ticker import FuncFormatter
+        ax.grid(axis="y", visible=True)
+        ax.grid(axis="x", visible=False)
+        ax.tick_params(axis="y", length=0, labelleft=True, labelright=False)
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: _fmt_value(v, unit)))
+    else:
+        # No value scale and no gridlines by default: the lines ARE the
+        # comparison, and a slope chart with a y-axis invites a reader to
+        # measure levels off a form built to show change.
+        ax.grid(False)
+        ax.tick_params(axis="y", length=0, labelleft=False, labelright=False)
     for side in ("left", "right", "top"):
         ax.spines[side].set_visible(False)
     ax.set_axisbelow(True)
@@ -313,6 +344,7 @@ def _fmt_value(v: float, unit: str = "") -> str:
 
 
 def _label_slope_ends(ax, pairs, colors, lead, t, *, unit, label_values,
+                      value_labels=None, inside_start=False, name_side="start",
                       pad_pt=5.0):
     """Name and value at the left end, value at the right, nothing clipped.
 
@@ -326,29 +358,68 @@ def _label_slope_ends(ax, pairs, colors, lead, t, *, unit, label_values,
     renderer = _get_renderer(fig)
     names = list(pairs)
 
-    left_text = {n: (f"{n}  {_fmt_value(pairs[n][0], unit)}" if label_values else n)
-                 for n in names}
-    right_text = {n: (_fmt_value(pairs[n][1], unit) if label_values else "")
-                  for n in names}
+    value_labels = value_labels or {}
+
+    def value_text(n, i):
+        if n in value_labels:
+            return str(value_labels[n][i])
+        return _fmt_value(pairs[n][i], unit)
+
+    if name_side == "end":
+        left_text = {n: (value_text(n, 0) if label_values else "") for n in names}
+        right_text = {n: (f"{n}  {value_text(n, 1)}" if label_values else n)
+                      for n in names}
+    else:
+        # Inside the plot, width is taken from the lines themselves, so the
+        # name stacks over its value rather than running beside it.
+        sep = "\n" if inside_start else "  "
+        left_text = {n: (f"{n}{sep}{value_text(n, 0)}" if label_values else n)
+                     for n in names}
+        right_text = {n: (value_text(n, 1) if label_values else "")
+                      for n in names}
+    # Nothing to fit at the start means nothing to move inside the plot.
+    inside_start = inside_start and any(left_text.values())
 
     # Reserve room in the FIGURE margins for both label columns before placing
     # anything: the labels sit outside the axes, so widening the axes would not
     # help and stretching the x-range would invent space between the periods.
     from ..layout import _apply_margins
-    left_in = (_widest_px(ax, left_text.values(), t.size.body, renderer)
-               + pad_pt * 2) / fig.dpi
-    right_in = (_widest_px(ax, right_text.values(), t.size.body, renderer)
-                + pad_pt * 2) / fig.dpi
-    fig._hegevis_label_left_in = max(
-        getattr(fig, "_hegevis_label_left_in", 0.0),
-        max(0.0, left_in - t.layout.margin.left / 25.4),
-    )
+    # Plus an outer margin, as ranked() keeps, so the longest name sits inside
+    # the figure rather than against its edge.
+    outer_in = 4.0 / 25.4
+    left_in = outer_in + (_widest_px(ax, left_text.values(), t.size.body, renderer)
+                          + pad_pt * 2) / fig.dpi
+    right_in = outer_in + (_widest_px(ax, right_text.values(), t.size.body, renderer)
+                           + pad_pt) / fig.dpi
+    if not inside_start:
+        fig._hegevis_label_left_in = max(
+            getattr(fig, "_hegevis_label_left_in", 0.0),
+            max(0.0, left_in - t.layout.margin.left / 25.4),
+        )
+    # As on the left, the theme margin counts towards the room the labels need
+    # rather than being added on top of it.
     fig._hegevis_label_right_in = max(
-        getattr(fig, "_hegevis_label_right_in", 0.0), right_in
+        getattr(fig, "_hegevis_label_right_in", 0.0),
+        max(0.0, right_in - t.layout.margin.right / 25.4),
     )
     _apply_margins(fig, t)
 
+    if inside_start:
+        # The left margin belongs to the value scale, so the start labels go
+        # inside the plot: open the x-range to the left by exactly their width,
+        # leaving the distance between the two periods untouched.
+        width_px = ax.get_window_extent(renderer=renderer).width
+        # One more pad than the labels need, to clear the scale's tick labels.
+        k = (left_in - outer_in + pad_pt / 72) * fig.dpi / width_px
+        hi = ax.get_xlim()[1]
+        ax.set_xlim(-hi * k / (1 - k), hi)
+    # Gridlines would otherwise run through labels sitting inside the plot.
+    mask = (dict(boxstyle="square,pad=0.1", facecolor=t.surface, edgecolor="none")
+            if inside_start else None)
+
     line_h = t.size.body * 1.25 * fig.dpi / 72
+    stacked = inside_start and label_values and name_side == "start"
+    lines_per = {"start": 2 if stacked else 1, "end": 1}
     for side, x, texts, ha, sign in (
         ("start", 0.0, left_text, "right", -1),
         ("end", 1.0, right_text, "left", 1),
@@ -358,7 +429,8 @@ def _label_slope_ends(ax, pairs, colors, lead, t, *, unit, label_values,
             key=lambda r: r[1],
         )
         orig = [ax.transData.transform((0, v))[1] for _, v in rows]
-        for (name, value), py, new_py in zip(rows, orig, _spread(orig, line_h)):
+        spread = _spread(orig, line_h * lines_per[side])
+        for (name, value), py, new_py in zip(rows, orig, spread):
             if not texts[name]:
                 continue
             is_context = bool(lead) and name not in lead
@@ -366,7 +438,7 @@ def _label_slope_ends(ax, pairs, colors, lead, t, *, unit, label_values,
                 texts[name], xy=(x, value), xycoords="data",
                 xytext=(sign * pad_pt, (new_py - py) * 72 / fig.dpi),
                 textcoords="offset points", ha=ha, va="center",
-                fontsize=t.size.body,
+                fontsize=t.size.body, bbox=mask,
                 color=t.ink_muted if is_context else t.ink_soft,
                 fontweight=t.weight_medium if name in lead else t.weight_normal,
                 annotation_clip=False, zorder=4,
